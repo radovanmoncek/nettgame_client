@@ -39,7 +39,7 @@ public class GameClientIntegrationTest {
     @Order(0)
     void nicknameOver8CharactersTest() throws InterruptedException {
 
-        gameStateTestingGameStateServerChannelHandler1.unicast(new GameStateRequestFlatBuffersSerializable(0, 0, 0, "VeryLongNicknameThatIsOverEightCharacters", GameStatus.START_SESSION, ""));
+        gameStateTestingGameStateServerChannelHandler1.unicast(new GameStateRequestFlatBuffersSerializable(GameStatus.START_SESSION, 0, 0, 0, "VeryLongNicknameThatIsOverEightCharacters", ""));
 
         var gameState = gameStateTestingGameStateServerChannelHandler1.poll();
 
@@ -52,7 +52,7 @@ public class GameClientIntegrationTest {
     @Order(1)
     void emptyPlayerNameTest() throws InterruptedException {
 
-        gameStateTestingGameStateServerChannelHandler1.unicast(new GameStateRequestFlatBuffersSerializable(0, 0, 0, "", GameStatus.START_SESSION, ""));
+        gameStateTestingGameStateServerChannelHandler1.unicast(new GameStateRequestFlatBuffersSerializable(GameStatus.START_SESSION, 0, 0, 0, "", ""));
 
         final var gameState = gameStateTestingGameStateServerChannelHandler1.poll();
 
@@ -65,7 +65,7 @@ public class GameClientIntegrationTest {
     @Order(2)
     void sessionStartTest() throws InterruptedException {
 
-        final var sessionRequestProtocolDataUnit = new GameStateRequestFlatBuffersSerializable(0, 0, 0, "Test", GameStatus.START_SESSION, "");
+        final var sessionRequestProtocolDataUnit = new GameStateRequestFlatBuffersSerializable(GameStatus.START_SESSION, 0, 0, 0, "Test", "");
 
         gameStateTestingGameStateServerChannelHandler1.unicast(sessionRequestProtocolDataUnit);
 
@@ -86,7 +86,7 @@ public class GameClientIntegrationTest {
 
         gameStateTestingGameStateServerChannelHandler1.poll();
 
-        gameStateTestingGameStateServerChannelHandler1.unicast(new GameStateRequestFlatBuffersSerializable(1008, 1008, 90, "", GameStatus.STATE_CHANGE, ""));
+        gameStateTestingGameStateServerChannelHandler1.unicast(new GameStateRequestFlatBuffersSerializable(GameStatus.STATE_CHANGE, 1008, 1008, 90, "", ""));
 
         final var gameState = gameStateTestingGameStateServerChannelHandler1.poll();
 
@@ -106,7 +106,13 @@ public class GameClientIntegrationTest {
     @Order(4)
     void sessionInvalidStateOverBoundsTest() throws Exception {
 
-        gameStateTestingGameStateServerChannelHandler1.unicast(new GameStateRequestFlatBuffersSerializable(801, 601, 15, "", GameStatus.STATE_CHANGE, ""));
+        gameStateTestingGameStateServerChannelHandler1.unicast(new GameStateRequestFlatBuffersSerializable(
+                GameStatus.STATE_CHANGE,
+                801,
+                601,
+                15,
+                "",
+                ""));
 
         final var gameState = gameStateTestingGameStateServerChannelHandler1.poll();
 
@@ -119,7 +125,13 @@ public class GameClientIntegrationTest {
     @Order(5)
     void sessionInvalidStateUnderBoundsTest() throws Exception {
 
-        gameStateTestingGameStateServerChannelHandler1.unicast(new GameStateRequestFlatBuffersSerializable(-1, -1, -15, "", GameStatus.STATE_CHANGE, ""));
+        gameStateTestingGameStateServerChannelHandler1.unicast(new GameStateRequestFlatBuffersSerializable(
+                GameStatus.STATE_CHANGE,
+                -1,
+                -1,
+                -15,
+                "",
+                ""));
 
         final var gameState = gameStateTestingGameStateServerChannelHandler1.poll();
 
@@ -132,7 +144,14 @@ public class GameClientIntegrationTest {
     @Order(6)
     void sessionValidStateMoveDeltaTest() throws Exception {
 
-        gameStateTestingGameStateServerChannelHandler1.unicast(new GameStateRequestFlatBuffersSerializable(1000, 1008, 180, "", GameStatus.STATE_CHANGE, ""));
+        gameStateTestingGameStateServerChannelHandler1.unicast(new GameStateRequestFlatBuffersSerializable(
+                GameStatus.STATE_CHANGE,
+                1000,
+                1008,
+                180,
+                "",
+                "")
+        );
 
         var gameState = gameStateTestingGameStateServerChannelHandler1.poll();
 
@@ -144,7 +163,14 @@ public class GameClientIntegrationTest {
         assertEquals(1008, gameState.player1().y());
         assertEquals(180, gameState.player1().rotationAngle());
 
-        gameStateTestingGameStateServerChannelHandler1.unicast(new GameStateRequestFlatBuffersSerializable(1008, 1008, 270, "", GameStatus.STATE_CHANGE, ""));
+        gameStateTestingGameStateServerChannelHandler1.unicast(new GameStateRequestFlatBuffersSerializable(
+                GameStatus.STATE_CHANGE,
+                1008,
+                1008,
+                270,
+                "",
+                "")
+        );
 
         gameState = gameStateTestingGameStateServerChannelHandler1.poll();
 
@@ -161,7 +187,14 @@ public class GameClientIntegrationTest {
     @Order(7)
     void sessionInvalidStateMoveDeltaTest() throws Exception {
 
-        gameStateTestingGameStateServerChannelHandler1.unicast(new GameStateRequestFlatBuffersSerializable(2, 6, 45, "", GameStatus.STATE_CHANGE, ""));
+        gameStateTestingGameStateServerChannelHandler1.unicast(new GameStateRequestFlatBuffersSerializable(
+                GameStatus.STATE_CHANGE,
+                2,
+                6,
+                45,
+                "",
+                "")
+        );
 
         var gameState = gameStateTestingGameStateServerChannelHandler1.poll();
 
@@ -169,7 +202,7 @@ public class GameClientIntegrationTest {
 
         assertEquals(GameStatus.INVALID_STATE, gameState.game().status());
 
-        gameStateTestingGameStateServerChannelHandler1.unicast(new GameStateRequestFlatBuffersSerializable(4, 4, 45, "", GameStatus.STATE_CHANGE, ""));
+        gameStateTestingGameStateServerChannelHandler1.unicast(new GameStateRequestFlatBuffersSerializable(GameStatus.STATE_CHANGE, 4, 4, 45, "", ""));
 
         gameState = gameStateTestingGameStateServerChannelHandler1.poll();
 
@@ -182,7 +215,7 @@ public class GameClientIntegrationTest {
     @Order(8)
     void sessionEndTest() throws Exception {
 
-        gameStateTestingGameStateServerChannelHandler1.unicast(new GameStateRequestFlatBuffersSerializable(0, 0, 0, "", GameStatus.STOP_SESSION, ""));
+        gameStateTestingGameStateServerChannelHandler1.unicast(new GameStateRequestFlatBuffersSerializable(GameStatus.STOP_SESSION, 0, 0, 0, "", ""));
 
         final var gameState = gameStateTestingGameStateServerChannelHandler1.poll();
 
@@ -208,7 +241,14 @@ public class GameClientIntegrationTest {
                 .build();
         player2.run();
 
-        gameStateTestingGameStateServerChannelHandler1.unicast(new GameStateRequestFlatBuffersSerializable(0, 0, 0, "Test", GameStatus.START_SESSION, ""));
+        gameStateTestingGameStateServerChannelHandler1.unicast(new GameStateRequestFlatBuffersSerializable(
+                GameStatus.START_SESSION,
+                0,
+                0,
+                0,
+                "Test",
+                "")
+        );
 
         var gameState = gameStateTestingGameStateServerChannelHandler1.poll();
 
@@ -227,7 +267,15 @@ public class GameClientIntegrationTest {
         //We need to wait until the game server is ready to serve us our session.
         TimeUnit.MILLISECONDS.sleep(4000);
 
-        gameStateTestingGameStateServerChannelHandler2.unicast(new GameStateRequestFlatBuffersSerializable(0, 0, 0, "Test2", GameStatus.JOIN_SESSION, gameCode));
+        gameStateTestingGameStateServerChannelHandler2.unicast(new GameStateRequestFlatBuffersSerializable(
+                GameStatus.JOIN_SESSION,
+                0,
+                0,
+                0,
+                "Test2",
+                gameCode
+                )
+        );
 
         var gameStateSecondPlayer = gameStateTestingGameStateServerChannelHandler2.poll();
 
@@ -263,7 +311,13 @@ public class GameClientIntegrationTest {
     @Order(10)
     void twoPlayerSessionTest() throws Exception {
 
-        gameStateTestingGameStateServerChannelHandler1.unicast(new GameStateRequestFlatBuffersSerializable(x1 + 8, y1, 90, "", GameStatus.STATE_CHANGE, ""));
+        gameStateTestingGameStateServerChannelHandler1.unicast(new GameStateRequestFlatBuffersSerializable(
+                GameStatus.STATE_CHANGE,
+                x1 + 8,
+                y1,
+                90,
+                "",
+                ""));
 
         var gameStateFirstPlayer = gameStateTestingGameStateServerChannelHandler1.poll();
 
@@ -286,7 +340,14 @@ public class GameClientIntegrationTest {
         x1 = gameStateFirstPlayer.player1().x();
         y1 = gameStateFirstPlayer.player1().y();
 
-        gameStateTestingGameStateServerChannelHandler2.unicast(new GameStateRequestFlatBuffersSerializable(x2, y2 + 8, 90, "", GameStatus.STATE_CHANGE, ""));
+        gameStateTestingGameStateServerChannelHandler2.unicast(new GameStateRequestFlatBuffersSerializable(
+                GameStatus.STATE_CHANGE,
+                x2,
+                y2 + 8,
+                90,
+                "",
+                "")
+        );
 
         gameStateSecondPlayer = gameStateTestingGameStateServerChannelHandler2.poll();
 

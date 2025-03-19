@@ -10,7 +10,7 @@ public final class NettgameClientLauncher {
 
         new NettgameClientBootstrapDirector(new NettgameClientBootstrapBuilder())
                 .makeDefaultGameClientBootstrapBuilder()
-                .buildChannelHandler(new ExampleServerChannelHandler())
+                .buildChannelHandler(new ExampleServerChannelHandler(true)) //todo: arg
                 .build()
                 .run();
     }

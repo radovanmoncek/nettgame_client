@@ -1,22 +1,25 @@
 package cz.radovanmoncek.client.modules.games.handlers;
 
 import com.badlogic.gdx.ApplicationListener;
+import com.badlogic.gdx.Gdx;
+import com.badlogic.gdx.Input;
+import com.badlogic.gdx.InputAdapter;
 import com.badlogic.gdx.backends.lwjgl3.Lwjgl3Application;
 import com.badlogic.gdx.backends.lwjgl3.Lwjgl3ApplicationConfiguration;
-import com.badlogic.gdx.graphics.Texture;
+import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
+import com.badlogic.gdx.utils.Disposable;
 import com.badlogic.gdx.utils.ScreenUtils;
+import com.badlogic.gdx.utils.viewport.FitViewport;
+import com.badlogic.gdx.utils.viewport.Viewport;
 import cz.radovanmoncek.client.modules.games.states.GameSessionRunningClientState;
-import cz.radovanmoncek.client.modules.games.states.JoinSessionSelectedClientState;
 import cz.radovanmoncek.client.modules.games.states.MainMenuClientState;
 import cz.radovanmoncek.client.ship.parents.states.ClientState;
 import cz.radovanmoncek.client.ship.tables.GameState;
-import cz.radovanmoncek.client.modules.games.models.GameStateRequestFlatBuffersSerializable;
 import cz.radovanmoncek.client.ship.parents.handlers.ServerChannelHandler;
 import cz.radovanmoncek.client.ship.tables.GameStatus;
 import io.netty.channel.ChannelHandlerContext;
 
-import java.awt.event.KeyEvent;
 import java.util.LinkedList;
 import java.util.Queue;
 import java.util.concurrent.Executors;
@@ -26,54 +29,112 @@ import java.util.logging.Logger;
 //todo: client side prediction time delta time topic in Thesis ???? ????
 public class ExampleServerChannelHandler extends ServerChannelHandler<GameState> implements ApplicationListener {
     private static final Logger logger = Logger.getLogger(ExampleServerChannelHandler.class.getName());
+    private final Queue<ClientState> clientStates;
+    private final Queue<GameState> gameStates;
+    private final LinkedList<Disposable> disposables;
     /**
      * State (state machine) design pattern
      */
     private ClientState clientState;
-    private final Queue<GameState> gameStates;
-    SpriteBatch batch;
-    Texture img;
-    GameStateRequestFlatBuffersSerializable sessionHostPlayer;
+    private Viewport viewport;
+    private SpriteBatch batch;
 
-    {
+    public ExampleServerChannelHandler(final boolean windowed) {
 
         gameStates = new LinkedList<>();
-        clientState = new MainMenuClientState();
+        disposables = new LinkedList<>();
+        clientStates = new LinkedList<>();
 
         Executors
-                .newSingleThreadExecutor()
-                .submit(this::startGUI);
+                .defaultThreadFactory()
+                .newThread(() -> startGUI(windowed))
+                .start();
+    }
+
+    private void startGUI(final boolean windowed) {
+
+        final var config = new Lwjgl3ApplicationConfiguration();
+
+        config.setForegroundFPS(60);
+        config.setTitle("example nettgame client");
+        config.setWindowedMode(800, 600);
+
+        if(!windowed)
+            config.setFullscreenMode(Lwjgl3ApplicationConfiguration.getDisplayMode());
+
+        new Lwjgl3Application(this, config);
     }
 
     @Override
     public void create() {
 
+        viewport = new FitViewport(8, 6);
         batch = new SpriteBatch();
-        /*img = new Texture("badlogic.jpg");*/
+        clientStates.offer(new MainMenuClientState());
     }
 
     @Override
     public void render() {
 
-        ScreenUtils.clear(0, 0, 0, 1);
+        ScreenUtils.clear(Color.BLACK);
 
-        clientState.render();
-        /*batch.begin();
-        batch.draw(img, x++, y++);
-        batch.end();*/
+        viewport.apply();
+
+        batch.setProjectionMatrix(viewport.getCamera().combined);
+        batch.begin();
+
+        final var newClientState = clientStates.poll();
+
+        if (newClientState != null) {
+
+            clientState = newClientState;
+
+            Gdx
+                    .input
+                    .setInputProcessor(new InputAdapter() {
+
+                        @Override
+                        public boolean keyTyped(char character) {
+
+                            clientState.onKeyPress(ExampleServerChannelHandler.this::unicast);
+
+                            return true;
+                        }
+
+                        @Override
+                        public boolean keyDown(int keycode) {
+                            Gdx.app.log("ExampleServerChannelHandler.keyDown", keycode + "");
+
+                            if(keycode == Input.Keys.ESCAPE)
+                                clientState.escapePressed(ExampleServerChannelHandler.this::unicast);
+
+                            return true;
+                        }
+                    });
+
+            newClientState.start(disposables);
+
+            clientState.processGameState(gameStates);
+        }
+
+        clientState.render(viewport, batch);
+
+        batch.end();
     }
-
     @Override
     public void dispose() {
 
+        disposables.forEach(Disposable::dispose);
         batch.dispose();
-        //img.dispose();
 
         disconnect();
     }
     @Override
     public void resize(int width, int height) {
+
+        viewport.update(width, height, true);
     }
+
     @Override
     public void pause() {
     }
@@ -87,82 +148,38 @@ public class ExampleServerChannelHandler extends ServerChannelHandler<GameState>
 
         switch (gameState.game().status()) {
 
-            case GameStatus.START_SESSION, GameStatus.JOIN_SESSION -> clientState = new GameSessionRunningClientState();
+            case GameStatus.START_SESSION, GameStatus.JOIN_SESSION -> {
+
+                gameStates.clear();
+                gameStates.offer(gameState);
+                clientStates.offer(new GameSessionRunningClientState());
+                clientState.processGameState(gameStates);
+            }
 
             case GameStatus.STATE_CHANGE -> {
 
-                final var playerState = gameState.player1();
+                gameStates.offer(gameState);
+                clientState.processGameState(gameStates);
+            }
 
-                if (playerState == null) {
-
-                    return;
-                }
-
-                sessionHostPlayer = new GameStateRequestFlatBuffersSerializable(
-                        playerState.x(),
-                        playerState.y(),
-                        playerState.rotationAngle(),
-                        sessionHostPlayer.name(),
-                        gameState.game().status(),
-                        sessionHostPlayer.gameCode()
-                );
+            case GameStatus.STOP_SESSION -> {
 
                 gameStates.offer(gameState);
+                clientState.processGameState(gameStates);
+                gameStates.clear();
+                clientStates.offer(new MainMenuClientState());
             }
+
+            case GameStatus.INVALID_STATE -> logger.warning("Invalid game state received");
         }
 
         logger.log(Level.INFO, "Session response received from the server {0}", gameState);
     }
-
     //todo: proper non-naive implementation (client-side prediction)
+
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
 
         super.exceptionCaught(ctx, cause);
-    }
-
-    private void startGUI() {
-
-        final var config = new Lwjgl3ApplicationConfiguration();
-
-        config.setForegroundFPS(60);
-        config.setTitle("example nettgame client");
-        config.setFullscreenMode(Lwjgl3ApplicationConfiguration.getDisplayMode());
-
-        new Lwjgl3Application(this, config);
-    }
-
-    private void sendPlayerInput(final KeyEvent keyEvent, int x, int y) {
-
-        int requestedX = x;
-        int requestedY = y;
-        int requestedRotationAngle = 0;
-
-        switch (keyEvent.getKeyCode()) {
-
-            case KeyEvent.VK_W -> requestedY = y - 8;
-
-            case KeyEvent.VK_A -> {
-                requestedX = x - 8;
-                requestedRotationAngle = 270;
-            }
-
-            case KeyEvent.VK_S -> {
-                requestedY = y + 8;
-                requestedRotationAngle = 180;
-            }
-
-            case KeyEvent.VK_D -> {
-                requestedX = x + 8;
-                requestedRotationAngle = 90;
-            }
-
-            default -> {
-
-                return;
-            }
-        }
-
-        unicast(new GameStateRequestFlatBuffersSerializable(requestedX, requestedY, requestedRotationAngle, "", GameStatus.STATE_CHANGE, ""));
     }
 }

@@ -6,6 +6,7 @@ import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.MessageToByteEncoder;
 
+import java.util.Arrays;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -24,7 +25,7 @@ public abstract class FlatBuffersEncoder<BandAid extends FlatBuffersSerializable
 
             final var body = encodeBodyAfterHeader(flatBuffersSerializable, builder);
 
-            logger.log(Level.INFO, "\n| {0}B | {1} |\n| {2} |", new Object[]{header.length + body.length, header, body});
+            logger.log(Level.INFO, "\n| {0}B | {1} |\n| {2} |", new Object[]{header.length + body.length, Arrays.toString(header), Arrays.toString(body)});
 
             out
                     .writeLong(header.length + body.length)

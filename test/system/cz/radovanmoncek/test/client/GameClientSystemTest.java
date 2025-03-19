@@ -19,7 +19,7 @@ public class GameClientSystemTest {
         robot = new Robot();
         bootstrap = new NettgameClientBootstrapDirector(new NettgameClientBootstrapBuilder())
                 .makeDefaultGameClientBootstrapBuilder()
-                .buildChannelHandler(new ExampleServerChannelHandler())
+                .buildChannelHandler(new ExampleServerChannelHandler(true))
                 .build();
     }
 

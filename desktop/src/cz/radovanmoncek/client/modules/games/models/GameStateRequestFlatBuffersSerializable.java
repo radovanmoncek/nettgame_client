@@ -8,7 +8,7 @@ import cz.radovanmoncek.client.ship.tables.GameStatus;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-public record GameStateRequestFlatBuffersSerializable(int x, int y, int rotationAngle, String name, byte gameStatus, String gameCode) implements FlatBuffersSerializable {
+public record GameStateRequestFlatBuffersSerializable(byte gameStatus, int x, int y, int rotationAngle, String name, String gameCode) implements FlatBuffersSerializable {
     private static final Logger logger = Logger.getLogger(GameStateRequestFlatBuffersSerializable.class.getName());
 
     @Override
