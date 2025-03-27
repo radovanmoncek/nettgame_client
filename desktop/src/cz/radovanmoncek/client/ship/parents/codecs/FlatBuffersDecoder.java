@@ -10,26 +10,28 @@ import java.util.logging.Logger;
 
 public abstract class FlatBuffersDecoder<FlatBuffersSchema> extends ByteToMessageDecoder {
     private static final Logger logger = Logger.getLogger(FlatBuffersDecoder.class.getName());
-    private static final int HEADER_SIZE = Long.BYTES;
+    private static final int lengthFieldSize = Long.BYTES;
 
     @Override
     protected void decode(final ChannelHandlerContext channelHandlerContext, final ByteBuf in, final List<Object> out) {
 
-        if (in.readableBytes() < HEADER_SIZE) {
+        if (in.readableBytes() < lengthFieldSize) {
 
             return;
         }
 
         in.markReaderIndex();
 
-        if (in.readableBytes() < in.readLong()) {
+        final var length = in.readLong();
+        final var headerLength = 1;
+        final var bodyLength = (int) length - headerLength;
+
+        if (in.readableBytes() < length) {
 
             in.resetReaderIndex();
 
             return;
         }
-
-        in.markReaderIndex();
 
         if (in.readableBytes() == 0) {
 
@@ -38,20 +40,19 @@ public abstract class FlatBuffersDecoder<FlatBuffersSchema> extends ByteToMessag
             return;
         }
 
-        final var headerNIOBuffer = in.nioBuffer();
+        final var header = in.readBytes(headerLength).nioBuffer();
 
-        if (!decodeHeader(headerNIOBuffer)) {
+        if (!decodeHeader(header)) {
 
             channelHandlerContext.fireChannelRead(in.resetReaderIndex().retain());
 
             return;
         }
 
-        in.readerIndex(in.readerIndex() + headerNIOBuffer.position());
+        final var body = in.readBytes(bodyLength).nioBuffer();
+        final var decodedSchema = decodeBodyAfterHeader(body);
 
-        out.add(decodeBodyAfterHeader(in.nioBuffer()));
-
-        in.readerIndex(in.writerIndex());
+        out.add(decodedSchema);
     }
 
     protected abstract boolean decodeHeader(final ByteBuffer buffer);

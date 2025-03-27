@@ -2,8 +2,6 @@ package cz.radovanmoncek.client.modules.games.handlers;
 
 import com.badlogic.gdx.ApplicationListener;
 import com.badlogic.gdx.Gdx;
-import com.badlogic.gdx.Input;
-import com.badlogic.gdx.InputAdapter;
 import com.badlogic.gdx.backends.lwjgl3.Lwjgl3Application;
 import com.badlogic.gdx.backends.lwjgl3.Lwjgl3ApplicationConfiguration;
 import com.badlogic.gdx.graphics.Color;
@@ -18,40 +16,65 @@ import cz.radovanmoncek.client.ship.parents.states.ClientState;
 import cz.radovanmoncek.client.ship.tables.GameState;
 import cz.radovanmoncek.client.ship.parents.handlers.ServerChannelHandler;
 import cz.radovanmoncek.client.ship.tables.GameStatus;
+import cz.radovanmoncek.client.ship.utilities.LoggingUtilities;
 import io.netty.channel.ChannelHandlerContext;
 
 import java.util.LinkedList;
-import java.util.Queue;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 //todo: client side prediction time delta time topic in Thesis ???? ????
 public class ExampleServerChannelHandler extends ServerChannelHandler<GameState> implements ApplicationListener {
     private static final Logger logger = Logger.getLogger(ExampleServerChannelHandler.class.getName());
-    private final Queue<ClientState> clientStates;
-    private final Queue<GameState> gameStates;
+    private final ConcurrentLinkedQueue<GameState> gameStates;
     private final LinkedList<Disposable> disposables;
     /**
      * State (state machine) design pattern
      */
-    private ClientState clientState;
+    private final AtomicReference<ClientState> clientState;
+    private final ClientState mainMenuClientState,
+                              gameSessionRunningClientState;
+    private final AtomicBoolean ended = new AtomicBoolean(false);
     private Viewport viewport;
-    private SpriteBatch batch;
+    private SpriteBatch batch,
+                        noViewportBatch;
+    private float deltaTime;
+
+    //https://stackoverflow.com/questions/6307648/change-global-setting-for-logger-instances
+    static {
+
+        LoggingUtilities.changeGlobalLoggingLevel(Level.ALL);
+    }
 
     public ExampleServerChannelHandler(final boolean windowed) {
 
-        gameStates = new LinkedList<>();
+        gameStates = new ConcurrentLinkedQueue<>();
         disposables = new LinkedList<>();
-        clientStates = new LinkedList<>();
+        clientState = new AtomicReference<>();
+        mainMenuClientState = new MainMenuClientState(this::unicast);
+        gameSessionRunningClientState = new GameSessionRunningClientState(this::unicast);
 
         Executors
                 .defaultThreadFactory()
-                .newThread(() -> startGUI(windowed))
+                .newThread(() -> {
+
+                    startBlockingGdx(windowed);
+
+                    ended.set(true);
+                })
+                .start();
+
+        Executors
+                .defaultThreadFactory()
+                .newThread(this::startBlockingGameStateDispatcher)
                 .start();
     }
 
-    private void startGUI(final boolean windowed) {
+    private void startBlockingGdx(final boolean windowed) {
 
         final var config = new Lwjgl3ApplicationConfiguration();
 
@@ -59,68 +82,63 @@ public class ExampleServerChannelHandler extends ServerChannelHandler<GameState>
         config.setTitle("example nettgame client");
         config.setWindowedMode(800, 600);
 
-        if(!windowed)
+        if (!windowed)
             config.setFullscreenMode(Lwjgl3ApplicationConfiguration.getDisplayMode());
 
         new Lwjgl3Application(this, config);
     }
 
+    private void startBlockingGameStateDispatcher(){
+
+        while(!ended.get()) {
+
+            if (clientState.get() == null || gameStates.isEmpty() || clientState.get() instanceof MainMenuClientState) {
+
+                continue;
+            }
+
+            logger.log(Level.INFO, "processing game state {0}", gameStates.peek());
+            clientState
+                    .get()
+                    .processGameState(gameStates.poll());
+        }
+    }
+
     @Override
     public void create() {
 
-        viewport = new FitViewport(8, 6);
+        viewport = new FitViewport(8f, 6f);
         batch = new SpriteBatch();
-        clientStates.offer(new MainMenuClientState());
+        noViewportBatch = new SpriteBatch();
+        mainMenuClientState.initialize(disposables);
+        gameSessionRunningClientState.initialize(disposables);
+        clientState.set(mainMenuClientState);
+        clientState
+                .get()
+                .registered();
     }
 
     @Override
     public void render() {
 
+        deltaTime += Gdx.graphics.getDeltaTime();
+
         ScreenUtils.clear(Color.BLACK);
 
         viewport.apply();
-
         batch.setProjectionMatrix(viewport.getCamera().combined);
         batch.begin();
-
-        final var newClientState = clientStates.poll();
-
-        if (newClientState != null) {
-
-            clientState = newClientState;
-
-            Gdx
-                    .input
-                    .setInputProcessor(new InputAdapter() {
-
-                        @Override
-                        public boolean keyTyped(char character) {
-
-                            clientState.onKeyPress(ExampleServerChannelHandler.this::unicast);
-
-                            return true;
-                        }
-
-                        @Override
-                        public boolean keyDown(int keycode) {
-                            Gdx.app.log("ExampleServerChannelHandler.keyDown", keycode + "");
-
-                            if(keycode == Input.Keys.ESCAPE)
-                                clientState.escapePressed(ExampleServerChannelHandler.this::unicast);
-
-                            return true;
-                        }
-                    });
-
-            newClientState.start(disposables);
-
-            clientState.processGameState(gameStates);
-        }
-
-        clientState.render(viewport, batch);
-
+        clientState
+                .get()
+                .render(viewport, batch, deltaTime);
         batch.end();
+        noViewportBatch.begin();
+        clientState
+                .get()
+                .noViewportRender(viewport, noViewportBatch, deltaTime);
+        noViewportBatch.end();
     }
+
     @Override
     public void dispose() {
 
@@ -128,7 +146,10 @@ public class ExampleServerChannelHandler extends ServerChannelHandler<GameState>
         batch.dispose();
 
         disconnect();
+
+        ended.set(true);
     }
+
     @Override
     public void resize(int width, int height) {
 
@@ -150,32 +171,30 @@ public class ExampleServerChannelHandler extends ServerChannelHandler<GameState>
 
             case GameStatus.START_SESSION, GameStatus.JOIN_SESSION -> {
 
-                gameStates.clear();
-                gameStates.offer(gameState);
-                clientStates.offer(new GameSessionRunningClientState());
-                clientState.processGameState(gameStates);
-            }
-
-            case GameStatus.STATE_CHANGE -> {
-
-                gameStates.offer(gameState);
-                clientState.processGameState(gameStates);
+                clientState.set(gameSessionRunningClientState);
+                clientState
+                        .get()
+                        .registered();
             }
 
             case GameStatus.STOP_SESSION -> {
 
-                gameStates.offer(gameState);
-                clientState.processGameState(gameStates);
                 gameStates.clear();
-                clientStates.offer(new MainMenuClientState());
+                clientState.set(mainMenuClientState);
+                clientState
+                        .get()
+                        .registered();
             }
 
             case GameStatus.INVALID_STATE -> logger.warning("Invalid game state received");
         }
 
-        logger.log(Level.INFO, "Session response received from the server {0}", gameState);
+        logger.log(Level.INFO, "Session response received from the server {0}", gameState.game().status());
+
+        //todo: proper non-naive implementation (client-side prediction)
+
+        gameStates.offer(gameState);
     }
-    //todo: proper non-naive implementation (client-side prediction)
 
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {

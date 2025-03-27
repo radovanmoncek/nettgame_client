@@ -1,8 +1,6 @@
 package cz.radovanmoncek.client.modules.games.states;
 
-import com.badlogic.gdx.Game;
 import com.badlogic.gdx.Gdx;
-import com.badlogic.gdx.Input;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
@@ -12,7 +10,6 @@ import com.badlogic.gdx.scenes.scene2d.ui.TextButton;
 import com.badlogic.gdx.scenes.scene2d.ui.TextField;
 import com.badlogic.gdx.scenes.scene2d.utils.ChangeListener;
 import com.badlogic.gdx.utils.Disposable;
-import com.badlogic.gdx.utils.viewport.FitViewport;
 import com.badlogic.gdx.utils.viewport.Viewport;
 import cz.radovanmoncek.client.modules.games.models.GameStateRequestFlatBuffersSerializable;
 import cz.radovanmoncek.client.ship.parents.states.ClientState;
@@ -20,110 +17,47 @@ import cz.radovanmoncek.client.ship.tables.GameState;
 import cz.radovanmoncek.client.ship.tables.GameStatus;
 
 import java.util.LinkedList;
-import java.util.Queue;
 import java.util.function.Consumer;
 
 public class MainMenuClientState implements ClientState {
+    private final Consumer<GameStateRequestFlatBuffersSerializable> unicast;
     private Stage stage;
     private Texture background;
-    private TextField input;
+    private TextField inputStart,
+            inputJoin1,
+            inputJoin2;
+
+    public MainMenuClientState(Consumer<GameStateRequestFlatBuffersSerializable> unicast) {
+
+        this.unicast = unicast;
+    }
 
     @Override
-    public void processGameState(Queue<GameState> gameStates) {
+    public void processGameState(GameState gameState) {
 
     }
 
     @Override
-    public void escapePressed(Consumer<GameStateRequestFlatBuffersSerializable> unicast) {
+    public void noViewportRender(Viewport viewport, SpriteBatch batch, float deltaTime) {
 
     }
 
     @Override
-    public void render(Viewport viewport, SpriteBatch batch) {
-
-        batch.draw(background, 0, 0, viewport.getWorldWidth(), viewport.getWorldHeight());
+    public void render(Viewport viewport, SpriteBatch batch, float deltaTime) {
 
         stage.draw();
-
-        /*graphics.setColor(Color.WHITE);
-
-        if (newSessionSelected)
-            graphics.setColor(Color.YELLOW);
-
-        final var newSessionText = "New Session";
-
-        graphics
-                .drawString(
-                        newSessionText,
-                        gameRenderer.getWidth() / 2 - graphics.getFontMetrics().stringWidth(newSessionText) / 2,
-                        gameRenderer.getHeight() / 2 - graphics.getFontMetrics().getHeight() / 2
-                );
-
-        graphics.setColor(Color.WHITE);
-
-        if (joinSessionSelected)
-            graphics.setColor(Color.YELLOW);
-
-        final var joinSessionText = "Join Session";
-
-        graphics.drawString(
-                joinSessionText,
-                gameRenderer.getWidth() / 2 - graphics.getFontMetrics().stringWidth(joinSessionText) / 2,
-                gameRenderer.getHeight() / 2 + graphics.getFontMetrics().getHeight() / 2
-        );*/
-
-            /*graphics.setColor(Color.BLUE);
-
-            graphics.setFont(new Font("Arial", Font.PLAIN, 12));
-
-            graphics.drawRect(
-                    gameRenderer.getWidth() / 2 - gameRenderer.getWidth() / 8,
-                    gameRenderer.getHeight() / 2 - gameRenderer.getHeight() / 16,
-                    gameRenderer.getWidth() / 4,
-                    gameRenderer.getHeight() / 8
-            );
-
-            if (userInput.isEmpty()) {
-
-                final var text = nickname == null ? "Please enter your nickname" : "Please enter session code";
-
-                graphics
-                        .drawString(
-                                text,
-                                gameRenderer.getWidth() / 2 - graphics.getFontMetrics().stringWidth(text) / 2,
-                                gameRenderer.getHeight() / 2 - graphics.getFontMetrics().getHeight() / 2
-                        );
-
-                return;
-            }
-
-            graphics.drawString(userInput.toString(), gameRenderer.getWidth() / 2, gameRenderer.getHeight() / 2);*/
-
-            /*graphics.setColor(Color.BLUE);
-
-            graphics.setFont(new Font("Arial", Font.BOLD, 12));
-
-            graphics.drawRect(
-                    gameRenderer.getWidth() / 2 - gameRenderer.getWidth() / 8,
-                    gameRenderer.getHeight() / 2 - gameRenderer.getHeight() / 16,
-                    gameRenderer.getWidth() / 4,
-                    gameRenderer.getHeight() / 8
-            );
-
-            if (userInput.isEmpty()) {
-
-                graphics.drawString("Please enter your nickname", gameRenderer.getWidth() / 2, gameRenderer.getHeight() / 2);
-
-                return;
-            }
-
-            graphics.drawString(userInput.toString(), gameRenderer.getWidth() / 2, gameRenderer.getHeight() / 2);*/
     }
 
     @Override
-    public void start(LinkedList<Disposable> disposables) {
+    public void registered() {
 
-        final var tempListener = Gdx.input.getInputProcessor();
+        Gdx
+                .input
+                .setInputProcessor(stage);
+    }
+
+    @Override
+    public void initialize(LinkedList<Disposable> disposables) {
 
         background = new Texture("badlogic.jpg");
         stage = new Stage();
@@ -132,28 +66,98 @@ public class MainMenuClientState implements ClientState {
         final var font = new BitmapFont();
         final var style = new TextButton.TextButtonStyle();
 
-//        final var buttonAtlas = new TextureAtlas(Gdx.files.internal("buttons/buttons.pack"));
-
-        Gdx.input.setInputProcessor(stage);
-
-        //final var skin = new Skin();
-
-        //      skin.addRegions(buttonAtlas);
-
         style.font = font;
         style.fontColor = Color.WHITE;
-        //    style.up = skin.getDrawable("up-button");
-        //  style.down = skin.getDrawable("down-button");
-        //style.checked = skin.getDrawable("checked-button");
 
-        final var button = new TextButton("New Session", style);
         final var buttonJoin = new TextButton("Join existing session", style);
+        final var button = new TextButton("New Session", style);
+
+        buttonJoin.setX(Gdx.graphics.getWidth() / (float) 2 - buttonJoin.getWidth() / 2);
+        buttonJoin.setY(Gdx.graphics.getHeight() / (float) 2 - 50);
+        buttonJoin.addListener(new ChangeListener() {
+
+            @Override
+            public void changed(ChangeEvent event, Actor actor) {
+
+                stage.clear();
+
+                final var inputStyle = new TextField.TextFieldStyle();
+
+                inputStyle.font = font;
+                inputStyle.fontColor = Color.WHITE;
+
+                inputJoin1 = new TextField("Please enter your nickname", inputStyle);
+
+                inputJoin1.setX(Gdx.graphics.getWidth() / (float) 2 - inputJoin1.getWidth() / 2);
+                inputJoin1.setY(Gdx.graphics.getHeight() / (float) 2);
+                inputJoin1.setSize(200, 100);
+
+                stage.addActor(inputJoin1);
+
+                inputJoin1.addListener(new InputListener() {
+
+                    @Override
+                    public boolean touchDown(InputEvent event, float x, float y, int pointer, int button) {
+
+                        inputJoin1.setText("");
+
+                        return true;
+                    }
+
+                    @Override
+                    public boolean keyTyped(InputEvent event, char character) {
+
+                        if (character == 10) {
+
+                            stage.clear();
+
+                            final var inputStyle = new TextField.TextFieldStyle();
+
+                            inputStyle.font = font;
+                            inputStyle.fontColor = Color.WHITE;
+
+                            inputJoin2 = new TextField("Please enter game code", inputStyle);
+                            inputJoin2.setX(Gdx.graphics.getWidth() / (float) 2 - inputJoin2.getWidth() / 2);
+                            inputJoin2.setY(Gdx.graphics.getHeight() / (float) 2);
+                            inputJoin2.setSize(200, 100);
+                            inputJoin2.addListener(new InputListener() {
+
+                                @Override
+                                public boolean touchDown(InputEvent event, float x, float y, int pointer, int button) {
+
+                                    inputJoin2.setText("");
+
+                                    return true;
+                                }
+
+                                @Override
+                                public boolean keyTyped(InputEvent event, char character) {
+
+                                    if (character == 10) {
+
+                                        final var serializable = new GameStateRequestFlatBuffersSerializable()
+                                                .withGameStatus(GameStatus.JOIN_SESSION)
+                                                .withName(inputJoin1.getText())
+                                                .withGameCode(inputJoin2.getText());
+
+                                        unicast.accept(serializable);
+                                    }
+
+                                    return true;
+                                }
+                            });
+
+                            stage.addActor(inputJoin2);
+                        }
+
+                        return true;
+                    }
+                });
+            }
+        });
 
         button.setX(Gdx.graphics.getWidth() / (float) 2 - button.getWidth() / 2);
-        buttonJoin.setX(Gdx.graphics.getWidth() / (float) 2 - buttonJoin.getWidth() / 2);
         button.setY(Gdx.graphics.getHeight() / (float) 2);
-        buttonJoin.setY(Gdx.graphics.getHeight() / (float) 2 - 50);
-
         button.addListener(new ChangeListener() {
 
             @Override
@@ -166,20 +170,19 @@ public class MainMenuClientState implements ClientState {
                 inputStyle.font = font;
                 inputStyle.fontColor = Color.WHITE;
 
-                input = new TextField("Please enter your nickname", inputStyle);
+                inputStart = new TextField("Please enter your nickname", inputStyle);
+                inputStart.setX(Gdx.graphics.getWidth() / (float) 2 - inputStart.getWidth() / 2);
+                inputStart.setY(Gdx.graphics.getHeight() / (float) 2);
+                inputStart.setSize(200, 100);
 
-                input.setX(Gdx.graphics.getWidth() / (float) 2 - input.getWidth() / 2);
-                input.setY(Gdx.graphics.getHeight() / (float) 2);
-                input.setSize(200, 100);
+                stage.addActor(inputStart);
 
-                stage.addActor(input);
-
-                input.addListener(new InputListener() {
+                inputStart.addListener(new InputListener() {
 
                     @Override
                     public boolean touchDown(InputEvent event, float x, float y, int pointer, int button) {
 
-                        input.setText("");
+                        inputStart.setText("");
 
                         return true;
                     }
@@ -187,9 +190,16 @@ public class MainMenuClientState implements ClientState {
                     @Override
                     public boolean keyTyped(InputEvent event, char character) {
 
-                        if(character == 10) {
+                        if (character == 10) {
 
-                            tempListener.keyTyped(character);
+                            final var serializable = new GameStateRequestFlatBuffersSerializable()
+                                    .withGameStatus(GameStatus.START_SESSION)
+                                    .withName(inputStart
+                                            .getText()
+                                            .trim()
+                                    );
+
+                            unicast.accept(serializable);
                         }
 
                         return true;
@@ -203,111 +213,5 @@ public class MainMenuClientState implements ClientState {
 
         disposables.add(stage);
         disposables.add(background);
-    }
-
-    @Override
-    public void onKeyPress(Consumer<GameStateRequestFlatBuffersSerializable> unicast) {
-
-        if (Gdx.input.isKeyJustPressed(Input.Keys.ENTER)) {
-
-            final var serializable = new GameStateRequestFlatBuffersSerializable(
-                    GameStatus.START_SESSION,
-                    0,
-                    0,
-                    0,
-                    input
-                            .getText()
-                            .trim(),
-                    ""
-            );
-
-            unicast.accept(serializable);
-        }
-
-        /*switch (keyEvent.getKeyCode()) {
-
-            case KeyEvent.VK_ENTER -> exampleServerChannelHandler.clientState = newSessionSelected ?
-                    new ExampleServerChannelHandler.NewSessionSelectedClientState() :
-                    new ExampleServerChannelHandler.JoinSessionSelectedClientState();
-
-            case KeyEvent.VK_W -> {
-
-                newSessionSelected = true;
-                joinSessionSelected = false;
-            }
-
-            case KeyEvent.VK_S -> {
-
-                newSessionSelected = false;
-                joinSessionSelected = true;
-            }
-        }*/
-
-
-            /*switch (keyEvent.getKeyCode()) {
-
-                case KeyEvent.VK_ENTER -> {
-
-                    if (userInput.isEmpty())
-                        return;
-
-                    if (nickname == null) {
-
-                        nickname = userInput.toString();
-
-                        userInput.delete(0, userInput.length());
-
-                        return;
-                    }
-
-                    if (userInput.length() != 8)
-                        return;
-
-                    exampleServerChannelHandler.unicast(new GameStateRequestFlatBuffersSerializable(0, 0, 0, nickname, GameStatus.JOIN_SESSION, userInput.toString()));
-                }
-
-                case KeyEvent.VK_BACK_SPACE -> {
-
-                    if (userInput.isEmpty())
-                        return;
-
-                    userInput.deleteCharAt(userInput.length() - 1);
-                }
-
-                default -> {
-
-                    if (userInput.length() > 8 || !String.copyValueOf(new char[]{keyEvent.getKeyChar()}).matches("[a-z0-9]"))
-                        return;
-
-                    userInput.append(keyEvent.getKeyChar());
-                }
-            }*/
-
-            /*switch (keyEvent.getKeyCode()) {
-
-                case KeyEvent.VK_ENTER -> {
-
-                    if (userInput.isEmpty())
-                        return;
-
-                    exampleServerChannelHandler.unicast(new GameStateRequestFlatBuffersSerializable(0, 0, 0, userInput.toString(), GameStatus.START_SESSION, ""));
-                }
-
-                case KeyEvent.VK_BACK_SPACE -> {
-
-                    if (userInput.isEmpty())
-                        return;
-
-                    userInput.deleteCharAt(userInput.length() - 1);
-                }
-
-                default -> {
-
-                    if (userInput.length() > 8 || !String.copyValueOf(new char[]{keyEvent.getKeyChar()}).matches("[a-z0-9]"))
-                        return;
-
-                    userInput.append(keyEvent.getKeyChar());
-                }
-            }*/
     }
 }

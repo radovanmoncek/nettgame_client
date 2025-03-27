@@ -11,6 +11,7 @@ public final class NettgameClientLauncher {
         new NettgameClientBootstrapDirector(new NettgameClientBootstrapBuilder())
                 .makeDefaultGameClientBootstrapBuilder()
                 .buildChannelHandler(new ExampleServerChannelHandler(true)) //todo: arg
+                .buildShutdownTimeout(0)
                 .build()
                 .run();
     }

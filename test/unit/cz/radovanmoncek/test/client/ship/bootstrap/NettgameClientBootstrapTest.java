@@ -51,7 +51,7 @@ public class NettgameClientBootstrapTest {
         assertEquals(address, returnEncapsulatedField(nettgameClientBootstrap.getClass(), "gameServerAddress").get(nettgameClientBootstrap));
     }
 
-    private static Field returnEncapsulatedField(final Class<?> clazz, final String fieldName) throws NoSuchFieldException {
+    private static Field returnEncapsulatedField(final Class<?> clazz, final String fieldName) throws NoSuchFieldException { //todo: ReflectionUtilities
 
         final var field = clazz.getDeclaredField(fieldName);
 

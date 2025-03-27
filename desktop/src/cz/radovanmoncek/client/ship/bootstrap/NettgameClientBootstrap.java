@@ -10,6 +10,7 @@ import io.netty.handler.logging.LoggingHandler;
 import java.net.InetAddress;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
+import java.util.logging.ConsoleHandler;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -44,6 +45,19 @@ public final class NettgameClientBootstrap {
      */
     private int reconnectAttempts;
     private int reconnectCounter;
+
+    //https://stackoverflow.com/questions/6307648/change-global-setting-for-logger-instances
+    static {
+
+        Logger
+                .getLogger("")
+                .setLevel(Level.FINE);
+
+        for(final var handler : Logger.getLogger("").getHandlers()) {
+
+            handler.setLevel(Level.FINE);
+        }
+    }
 
     private NettgameClientBootstrap() {
 

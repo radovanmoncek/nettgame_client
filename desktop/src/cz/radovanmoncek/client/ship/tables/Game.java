@@ -48,4 +48,3 @@ public final class Game extends Table {
     public Game get(Game obj, int j) {  return obj.__assign(__indirect(__element(j), bb), bb); }
   }
 }
-

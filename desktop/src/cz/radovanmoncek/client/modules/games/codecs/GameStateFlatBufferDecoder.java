@@ -9,6 +9,7 @@ public class GameStateFlatBufferDecoder extends FlatBuffersDecoder<GameState> {
 
     @Override
     protected boolean decodeHeader(ByteBuffer in) {
+
         return in.get() == 'G';
     }
 
